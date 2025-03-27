@@ -8,25 +8,26 @@ export default function PanicButton() {
   }
 
   return (
-    <View style={styles.container}>
+   
       <TouchableOpacity style={styles.panicButton} onPress={handlePress} activeOpacity={0.7}>
         <Text style={styles.buttonText}>PANIC</Text>
       </TouchableOpacity>
-    </View>
   )
 }
 
 const { width, height } = Dimensions.get("window")
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingTop: height * 0.1, // This pushes the button slightly below center
-  },
+  // container: {
+  //   flex: 1,
+  //   justifyContent: "center",
+  //   alignItems: "center",
+  //   paddingTop: height * 0.1, // This pushes the button slightly below center
+  // },
   panicButton: {
+    position: "static",
     backgroundColor: "red",
+    top: 100,
     width: 100,
     height: 100,
     borderRadius: 50, // Makes it a perfect circle
