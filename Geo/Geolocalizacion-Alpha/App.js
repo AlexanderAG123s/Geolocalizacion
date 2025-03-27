@@ -1,8 +1,9 @@
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView, {Marker, Polyline } from 'react-native-maps';
 import MapviewDirections from 'react-native-maps-directions';
+import PanicButton from './components/panic-button';
 import * as Location from "expo-location"
 
 
@@ -53,6 +54,10 @@ export default function App() {
       /> 
       </MapView>
 
+     
+
+      <PanicButton/>
+
     </View>
   );
 }
@@ -69,5 +74,15 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     
+  },
+  warning_button: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    top: 700,
+    right: 170,
+    backgroundColor: 'red',
+    padding: 10,
+    borderRadius: 10,
   }
 });
