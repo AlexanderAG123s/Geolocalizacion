@@ -1,7 +1,7 @@
 "use client"
 
 import { StatusBar } from "expo-status-bar"
-import React, { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef } from "react"
 import {
   Pressable,
   StyleSheet,
@@ -14,17 +14,30 @@ import {
   TextInput,
   ScrollView,
   Animated,
+  Dimensions,
 } from "react-native"
-import MapView, { Marker, Polyline } from "react-native-maps"
+import MapView, { Marker } from "react-native-maps"
 import { FontAwesome } from "@expo/vector-icons"
 import * as Location from "expo-location"
+import { ThemeProvider, useTheme } from "./context/ThemeContext"
 
-export default function App() {
-  const [origin, setOrigin] = React.useState({
+// Main App wrapped with ThemeProvider
+export default function AppWrapper() {
+  return (
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  )
+}
+
+function App() {
+  const { theme, isDarkMode, toggleTheme } = useTheme()
+
+  const [origin, setOrigin] = useState({
     latitude: 19.6845823,
     longitude: -99.1627131,
   })
-  const [destination, setDestination] = React.useState({
+  const [destination, setDestination] = useState({
     latitude: 19.679444556072685,
     longitude: -99.14825848149951,
   })
@@ -220,77 +233,126 @@ export default function App() {
     switch (activeTab) {
       case "vehicle":
         return (
-          <ScrollView style={styles.sidebar_tab_content}>
-            <Text style={styles.sidebar_section_title}>Tarjeta Vehicular</Text>
+          <ScrollView style={[styles.sidebar_tab_content, { backgroundColor: theme.background }]}>
+            <Text style={[styles.sidebar_section_title, { color: theme.text }]}>Tarjeta Vehicular</Text>
             <View style={styles.form_group}>
-              <Text style={styles.form_label}>Placa</Text>
+              <Text style={[styles.form_label, { color: theme.text }]}>Placa</Text>
               <TextInput
-                style={styles.form_input}
+                style={[
+                  styles.form_input,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
                 value={vehicleInfo.plate}
                 onChangeText={(text) => handleVehicleInfoChange("plate", text)}
                 placeholder="Ingrese placa"
-                placeholderTextColor="#999"
+                placeholderTextColor={isDarkMode ? "#777" : "#999"}
               />
             </View>
             <View style={styles.form_group}>
-              <Text style={styles.form_label}>Marca</Text>
+              <Text style={[styles.form_label, { color: theme.text }]}>Marca</Text>
               <TextInput
-                style={styles.form_input}
+                style={[
+                  styles.form_input,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
                 value={vehicleInfo.make}
                 onChangeText={(text) => handleVehicleInfoChange("make", text)}
                 placeholder="Ingrese marca"
-                placeholderTextColor="#999"
+                placeholderTextColor={isDarkMode ? "#777" : "#999"}
               />
             </View>
             <View style={styles.form_group}>
-              <Text style={styles.form_label}>Modelo</Text>
+              <Text style={[styles.form_label, { color: theme.text }]}>Modelo</Text>
               <TextInput
-                style={styles.form_input}
+                style={[
+                  styles.form_input,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
                 value={vehicleInfo.model}
                 onChangeText={(text) => handleVehicleInfoChange("model", text)}
                 placeholder="Ingrese modelo"
-                placeholderTextColor="#999"
+                placeholderTextColor={isDarkMode ? "#777" : "#999"}
               />
             </View>
             <View style={styles.form_group}>
-              <Text style={styles.form_label}>Año</Text>
+              <Text style={[styles.form_label, { color: theme.text }]}>Año</Text>
               <TextInput
-                style={styles.form_input}
+                style={[
+                  styles.form_input,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
                 value={vehicleInfo.year}
                 onChangeText={(text) => handleVehicleInfoChange("year", text)}
                 placeholder="Ingrese año"
-                placeholderTextColor="#999"
+                placeholderTextColor={isDarkMode ? "#777" : "#999"}
                 keyboardType="numeric"
               />
             </View>
             <View style={styles.form_group}>
-              <Text style={styles.form_label}>Color</Text>
+              <Text style={[styles.form_label, { color: theme.text }]}>Color</Text>
               <TextInput
-                style={styles.form_input}
+                style={[
+                  styles.form_input,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
                 value={vehicleInfo.color}
                 onChangeText={(text) => handleVehicleInfoChange("color", text)}
                 placeholder="Ingrese color"
-                placeholderTextColor="#999"
+                placeholderTextColor={isDarkMode ? "#777" : "#999"}
               />
             </View>
             <View style={styles.form_group}>
-              <Text style={styles.form_label}>Número VIN</Text>
+              <Text style={[styles.form_label, { color: theme.text }]}>Número VIN</Text>
               <TextInput
-                style={styles.form_input}
+                style={[
+                  styles.form_input,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
                 value={vehicleInfo.vin}
                 onChangeText={(text) => handleVehicleInfoChange("vin", text)}
                 placeholder="Ingrese VIN"
-                placeholderTextColor="#999"
+                placeholderTextColor={isDarkMode ? "#777" : "#999"}
               />
             </View>
             <View style={styles.form_group}>
-              <Text style={styles.form_label}>Seguro</Text>
+              <Text style={[styles.form_label, { color: theme.text }]}>Seguro</Text>
               <TextInput
-                style={styles.form_input}
+                style={[
+                  styles.form_input,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
                 value={vehicleInfo.insurance}
                 onChangeText={(text) => handleVehicleInfoChange("insurance", text)}
                 placeholder="Ingrese información de seguro"
-                placeholderTextColor="#999"
+                placeholderTextColor={isDarkMode ? "#777" : "#999"}
               />
             </View>
             <TouchableOpacity
@@ -305,27 +367,38 @@ export default function App() {
         )
       case "settings":
         return (
-          <View style={styles.sidebar_tab_content}>
-            <Text style={styles.sidebar_section_title}>Configuración</Text>
-            <View style={styles.settings_option}>
-              <Text style={styles.settings_label}>Intervalo de actualización</Text>
-              <Text style={styles.settings_value}>1 segundo</Text>
+          <View style={[styles.sidebar_tab_content, { backgroundColor: theme.background }]}>
+            <Text style={[styles.sidebar_section_title, { color: theme.text }]}>Configuración</Text>
+
+            {/* Theme toggle option */}
+            <View style={[styles.settings_option, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.settings_label, { color: theme.text }]}>Tema</Text>
+              <TouchableOpacity onPress={toggleTheme}>
+                <Text style={[styles.settings_value, { color: theme.primary }]}>{isDarkMode ? "Oscuro" : "Claro"}</Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.settings_option}>
-              <Text style={styles.settings_label}>Precisión de ubicación</Text>
-              <Text style={styles.settings_value}>Alta</Text>
+
+            <View style={[styles.settings_option, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.settings_label, { color: theme.text }]}>Intervalo de actualización</Text>
+              <Text style={[styles.settings_value, { color: theme.primary }]}>1 segundo</Text>
             </View>
-            <View style={styles.settings_option}>
-              <Text style={styles.settings_label}>Notificaciones</Text>
-              <Text style={styles.settings_value}>Activadas</Text>
+            <View style={[styles.settings_option, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.settings_label, { color: theme.text }]}>Precisión de ubicación</Text>
+              <Text style={[styles.settings_value, { color: theme.primary }]}>Alta</Text>
+            </View>
+            <View style={[styles.settings_option, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.settings_label, { color: theme.text }]}>Notificaciones</Text>
+              <Text style={[styles.settings_value, { color: theme.primary }]}>Activadas</Text>
             </View>
           </View>
         )
       case "contacts":
         return (
-          <View style={styles.sidebar_tab_content}>
-            <Text style={styles.sidebar_section_title}>Contactos de Emergencia</Text>
-            <Text style={styles.sidebar_text}>Agregue contactos que serán notificados en caso de emergencia.</Text>
+          <View style={[styles.sidebar_tab_content, { backgroundColor: theme.background }]}>
+            <Text style={[styles.sidebar_section_title, { color: theme.text }]}>Contactos de Emergencia</Text>
+            <Text style={[styles.sidebar_text, { color: isDarkMode ? "#aaa" : "#666" }]}>
+              Agregue contactos que serán notificados en caso de emergencia.
+            </Text>
             <TouchableOpacity style={styles.add_contact_button}>
               <FontAwesome name="plus" size={16} color="white" />
               <Text style={styles.add_contact_text}>Agregar Contacto</Text>
@@ -343,52 +416,89 @@ export default function App() {
     outputRange: [-250, 0],
   })
 
-  // Calculate main content margin based on sidebar visibility
-  const contentMargin = sidebarAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 250],
-  })
+  // Get screen dimensions
+  const screenWidth = Dimensions.get("window").width
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="auto" />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar style={theme.statusBar} />
 
       {/* Left Sidebar */}
-      <Animated.View style={[styles.sidebar, { left: sidebarLeft }]}>
-        <View style={styles.sidebar_header}>
-          <Text style={styles.sidebar_title}>Opciones</Text>
+      <Animated.View
+        style={[
+          styles.sidebar,
+          {
+            left: sidebarLeft,
+            backgroundColor: theme.background,
+            borderRightColor: theme.border,
+            borderRightWidth: 1,
+          },
+        ]}
+      >
+        <View style={[styles.sidebar_header, { borderBottomColor: theme.border }]}>
+          <Text style={[styles.sidebar_title, { color: theme.text }]}>Opciones</Text>
           <TouchableOpacity style={styles.sidebar_close} onPress={toggleSidebar}>
-            <FontAwesome name="times" size={24} color="black" />
+            <FontAwesome name="times" size={24} color={theme.text} />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.sidebar_tabs}>
+        <View style={[styles.sidebar_tabs, { borderBottomColor: theme.border }]}>
           <TouchableOpacity
-            style={[styles.sidebar_tab, activeTab === "vehicle" && styles.sidebar_tab_active]}
+            style={[
+              styles.sidebar_tab,
+              { backgroundColor: isDarkMode ? "#2a2a2a" : "#f5f5f5" },
+              activeTab === "vehicle" && styles.sidebar_tab_active,
+            ]}
             onPress={() => setActiveTab("vehicle")}
           >
-            <FontAwesome name="car" size={20} color={activeTab === "vehicle" ? "#fff" : "#333"} />
-            <Text style={[styles.sidebar_tab_text, activeTab === "vehicle" && styles.sidebar_tab_text_active]}>
+            <FontAwesome name="car" size={20} color={activeTab === "vehicle" ? "#fff" : theme.text} />
+            <Text
+              style={[
+                styles.sidebar_tab_text,
+                { color: theme.text },
+                activeTab === "vehicle" && styles.sidebar_tab_text_active,
+              ]}
+            >
               Vehículo
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.sidebar_tab, activeTab === "settings" && styles.sidebar_tab_active]}
+            style={[
+              styles.sidebar_tab,
+              { backgroundColor: isDarkMode ? "#2a2a2a" : "#f5f5f5" },
+              activeTab === "settings" && styles.sidebar_tab_active,
+            ]}
             onPress={() => setActiveTab("settings")}
           >
-            <FontAwesome name="cog" size={20} color={activeTab === "settings" ? "#fff" : "#333"} />
-            <Text style={[styles.sidebar_tab_text, activeTab === "settings" && styles.sidebar_tab_text_active]}>
+            <FontAwesome name="cog" size={20} color={activeTab === "settings" ? "#fff" : theme.text} />
+            <Text
+              style={[
+                styles.sidebar_tab_text,
+                { color: theme.text },
+                activeTab === "settings" && styles.sidebar_tab_text_active,
+              ]}
+            >
               Ajustes
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.sidebar_tab, activeTab === "contacts" && styles.sidebar_tab_active]}
+            style={[
+              styles.sidebar_tab,
+              { backgroundColor: isDarkMode ? "#2a2a2a" : "#f5f5f5" },
+              activeTab === "contacts" && styles.sidebar_tab_active,
+            ]}
             onPress={() => setActiveTab("contacts")}
           >
-            <FontAwesome name="users" size={20} color={activeTab === "contacts" ? "#fff" : "#333"} />
-            <Text style={[styles.sidebar_tab_text, activeTab === "contacts" && styles.sidebar_tab_text_active]}>
+            <FontAwesome name="users" size={20} color={activeTab === "contacts" ? "#fff" : theme.text} />
+            <Text
+              style={[
+                styles.sidebar_tab_text,
+                { color: theme.text },
+                activeTab === "contacts" && styles.sidebar_tab_text_active,
+              ]}
+            >
               Contactos
             </Text>
           </TouchableOpacity>
@@ -397,10 +507,14 @@ export default function App() {
         {renderSidebarContent()}
       </Animated.View>
 
-      {/* Main Content */}
-      <Animated.View style={[styles.main_content, { marginLeft: contentMargin }]}>
+      {/* Semi-transparent overlay when sidebar is open */}
+      {sidebarVisible && <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={toggleSidebar} />}
+
+      {/* Main Content - No longer using Animated.View with marginLeft */}
+      <View style={styles.main_content}>
         <MapView
           style={styles.map}
+          customMapStyle={isDarkMode ? theme.mapStyle : []}
           region={{
             latitude: origin.latitude,
             longitude: origin.longitude,
@@ -417,17 +531,51 @@ export default function App() {
             coordinate={origin}
             onDragEnd={(direction) => setOrigin(direction.nativeEvent.coordinate)}
           />
-        
         </MapView>
 
         {/* Location button to recenter on user */}
-        <Pressable style={styles.location_button} onPress={centerOnUser}>
-          <FontAwesome name="location-arrow" size={24} color="black" />
+        <Pressable
+          style={[
+            styles.location_button,
+            {
+              backgroundColor: isDarkMode ? theme.dark : "white",
+              borderColor: isDarkMode ? theme.border : "transparent",
+              borderWidth: isDarkMode ? 1 : 0,
+            },
+          ]}
+          onPress={centerOnUser}
+        >
+          <FontAwesome name="location-arrow" size={24} color={isDarkMode ? theme.light : "black"} />
         </Pressable>
 
         {/* Sidebar toggle button */}
-        <Pressable style={styles.sidebar_button} onPress={toggleSidebar}>
-          <FontAwesome name="bars" size={24} color="black" />
+        <Pressable
+          style={[
+            styles.sidebar_button,
+            {
+              backgroundColor: isDarkMode ? theme.dark : "white",
+              borderColor: isDarkMode ? theme.border : "transparent",
+              borderWidth: isDarkMode ? 1 : 0,
+            },
+          ]}
+          onPress={toggleSidebar}
+        >
+          <FontAwesome name="bars" size={24} color={isDarkMode ? theme.light : "black"} />
+        </Pressable>
+
+        {/* Theme toggle button */}
+        <Pressable
+          style={[
+            styles.theme_button,
+            {
+              backgroundColor: isDarkMode ? theme.dark : "white",
+              borderColor: isDarkMode ? theme.border : "transparent",
+              borderWidth: isDarkMode ? 1 : 0,
+            },
+          ]}
+          onPress={toggleTheme}
+        >
+          <FontAwesome name={isDarkMode ? "sun-o" : "moon-o"} size={24} color={isDarkMode ? theme.light : "black"} />
         </Pressable>
 
         {/* Panic button - changes color when tracking is active */}
@@ -449,7 +597,7 @@ export default function App() {
             </Text>
           </View>
         )}
-      </Animated.View>
+      </View>
 
       {/* Emergency Type Modal */}
       <Modal
@@ -461,7 +609,7 @@ export default function App() {
         }}
       >
         <SafeAreaView style={styles.modal_container}>
-          <View style={styles.modal_content}>
+          <View style={[styles.modal_content, { backgroundColor: isDarkMode ? "#222" : "#333" }]}>
             <Text style={styles.modal_title}>Seleccione Tipo de Emergencia</Text>
 
             {emergencyTypes.map((type) => (
@@ -475,7 +623,10 @@ export default function App() {
               </TouchableOpacity>
             ))}
 
-            <TouchableOpacity style={styles.cancel_button} onPress={() => setModalVisible(false)}>
+            <TouchableOpacity
+              style={[styles.cancel_button, { backgroundColor: isDarkMode ? "#444" : "#555" }]}
+              onPress={() => setModalVisible(false)}
+            >
               <Text style={styles.cancel_text}>Cancelar</Text>
             </TouchableOpacity>
           </View>
@@ -497,6 +648,15 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    zIndex: 5,
+  },
   warning_button: {
     position: "absolute",
     width: 100,
@@ -512,6 +672,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 1, // Ensure button stays above map
   },
   tracking_active: {
     backgroundColor: "#d9534f",
@@ -538,6 +699,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 1, // Ensure button stays above map
   },
   sidebar_button: {
     position: "absolute",
@@ -554,6 +716,24 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 1, // Ensure button stays above map
+  },
+  theme_button: {
+    position: "absolute",
+    width: 50,
+    height: 50,
+    backgroundColor: "white",
+    borderRadius: 25,
+    top: 120,
+    right: 20,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1, // Ensure button stays above map
   },
   status_indicator: {
     position: "absolute",
@@ -563,6 +743,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
+    zIndex: 1, // Ensure indicator stays above map
   },
   status_text: {
     color: "white",
