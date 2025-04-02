@@ -1,7 +1,7 @@
 "use client"
 
 import { StatusBar } from "expo-status-bar"
-import { useEffect, useState, useRef } from "react"
+import React, { useEffect, useState, useRef } from "react"
 import {
   Pressable,
   StyleSheet,
@@ -14,19 +14,53 @@ import {
   TextInput,
   ScrollView,
   Animated,
-  Dimensions,
+  LogBox,
 } from "react-native"
-import MapView, { Marker } from "react-native-maps"
 import { FontAwesome } from "@expo/vector-icons"
 import * as Location from "expo-location"
 import { ThemeProvider, useTheme } from "./context/ThemeContext"
 
-// Main App wrapped with ThemeProvider
+// Ignorar advertencias específicas que no son críticas
+LogBox.ignoreLogs(["ViewPropTypes will be removed", "ColorPropType will be removed", "Animated: `useNativeDriver`"])
+
+// Componente para capturar errores
+class ErrorBoundary extends React.Component {
+  state = { hasError: false, error: null }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.log("Error en la aplicación:", error)
+    console.log("Información adicional:", errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorTitle}>¡Ups! Algo salió mal</Text>
+          <Text style={styles.errorMessage}>{this.state.error?.toString()}</Text>
+          <TouchableOpacity style={styles.errorButton} onPress={() => this.setState({ hasError: false })}>
+            <Text style={styles.errorButtonText}>Intentar de nuevo</Text>
+          </TouchableOpacity>
+        </View>
+      )
+    }
+
+    return this.props.children
+  }
+}
+
+// Main App wrapped with ThemeProvider and ErrorBoundary
 export default function AppWrapper() {
   return (
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    </ErrorBoundary>
   )
 }
 
@@ -36,10 +70,6 @@ function App() {
   const [origin, setOrigin] = useState({
     latitude: 19.6845823,
     longitude: -99.1627131,
-  })
-  const [destination, setDestination] = useState({
-    latitude: 19.679444556072685,
-    longitude: -99.14825848149951,
   })
   const [userLocation, setUserLocation] = useState(null)
   const [errorMsg, setErrorMsg] = useState(null)
@@ -77,34 +107,39 @@ function App() {
 
   // Request location permissions on app start
   useEffect(() => {
-    ;(async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync()
-
-      if (status !== "granted") {
-        setErrorMsg("Permission to access location was denied")
-        Alert.alert("Permission Denied", "Location permission is required for this feature.")
-        return
-      }
-
-      // Get initial location once
+    const getLocationPermission = async () => {
       try {
-        const initialLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        })
+        const { status } = await Location.requestForegroundPermissionsAsync()
 
-        const userCoords = {
-          latitude: initialLocation.coords.latitude,
-          longitude: initialLocation.coords.longitude,
+        if (status !== "granted") {
+          setErrorMsg("Permission to access location was denied")
+          console.log("Location permission denied")
+          return
         }
 
-        setUserLocation(userCoords)
-        setOrigin(userCoords)
+        // Get initial location once
+        try {
+          const initialLocation = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          })
+
+          const userCoords = {
+            latitude: initialLocation.coords.latitude,
+            longitude: initialLocation.coords.longitude,
+          }
+
+          setUserLocation(userCoords)
+          setOrigin(userCoords)
+        } catch (error) {
+          console.error("Error getting initial location:", error)
+          setErrorMsg("Error getting location")
+        }
       } catch (error) {
-        console.error("Error getting initial location:", error)
-        setErrorMsg("Error getting location")
-        Alert.alert("Location Error", "Could not get your current location.")
+        console.error("Error requesting permissions:", error)
       }
-    })()
+    }
+
+    getLocationPermission()
 
     // Clean up any subscription when component unmounts
     return () => {
@@ -211,7 +246,6 @@ function App() {
       setOrigin(userCoords)
     } catch (error) {
       console.error("Error updating location:", error)
-      Alert.alert("Location Error", "Could not update your current location.")
     }
   }
 
@@ -416,8 +450,28 @@ function App() {
     outputRange: [-250, 0],
   })
 
-  // Get screen dimensions
-  const screenWidth = Dimensions.get("window").width
+  // Render Map Fallback
+  const renderMapFallback = () => (
+    <View style={[styles.mapFallback, { backgroundColor: isDarkMode ? "#1a1a1a" : "#f0f0f0" }]}>
+      <Text style={[styles.mapFallbackText, { color: theme.text }]}>Ubicación actual:</Text>
+      {userLocation ? (
+        <View style={styles.locationInfo}>
+          <Text style={[styles.locationText, { color: theme.text }]}>Latitud: {userLocation.latitude.toFixed(6)}</Text>
+          <Text style={[styles.locationText, { color: theme.text }]}>
+            Longitud: {userLocation.longitude.toFixed(6)}
+          </Text>
+          {isTracking && (
+            <Text style={[styles.trackingText, { color: "#ff6b6b" }]}>
+              Enviando ubicación (Emergencia:{" "}
+              {emergencyTypes.find((t) => t.id === emergencyType)?.title || emergencyType})
+            </Text>
+          )}
+        </View>
+      ) : (
+        <Text style={[styles.locationText, { color: theme.text }]}>Obteniendo ubicación...</Text>
+      )}
+    </View>
+  )
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -512,26 +566,8 @@ function App() {
 
       {/* Main Content - No longer using Animated.View with marginLeft */}
       <View style={styles.main_content}>
-        <MapView
-          style={styles.map}
-          customMapStyle={isDarkMode ? theme.mapStyle : []}
-          region={{
-            latitude: origin.latitude,
-            longitude: origin.longitude,
-            latitudeDelta: 0.09,
-            longitudeDelta: 0.04,
-          }}
-        >
-          {/* User's current location marker */}
-          {userLocation && <Marker coordinate={userLocation} title="You are here" pinColor="blue" />}
-
-          <Marker
-            pinColor="Blue"
-            draggable
-            coordinate={origin}
-            onDragEnd={(direction) => setOrigin(direction.nativeEvent.coordinate)}
-          />
-        </MapView>
+        {/* Fallback UI instead of MapView */}
+        {renderMapFallback()}
 
         {/* Location button to recenter on user */}
         <Pressable
@@ -644,9 +680,33 @@ const styles = StyleSheet.create({
     flex: 1,
     position: "relative",
   },
-  map: {
+  mapFallback: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  mapFallbackText: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 20,
+  },
+  locationInfo: {
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ddd",
     width: "100%",
-    height: "100%",
+    alignItems: "center",
+  },
+  locationText: {
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  trackingText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginTop: 10,
   },
   overlay: {
     position: "absolute",
@@ -934,6 +994,37 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     marginLeft: 8,
+  },
+  // Error boundary styles
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: "#f8f9fa",
+  },
+  errorTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#dc3545",
+  },
+  errorMessage: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 20,
+    color: "#343a40",
+  },
+  errorButton: {
+    backgroundColor: "#007bff",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  errorButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 })
 

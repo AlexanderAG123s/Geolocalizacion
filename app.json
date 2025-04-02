@@ -1,35 +1,47 @@
 {
-  "expo": {
-    "name": "Geolocalizacion-Alpha",
-    "slug": "geolocalizacion",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
-    "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+    "expo": {
+      "name": "EmergencyApp",
+      "slug": "emergency-app",
+      "version": "1.0.0",
+      "orientation": "portrait",
+      "icon": "./assets/icon.png",
+      "userInterfaceStyle": "automatic",
+      "splash": {
+        "image": "./assets/splash.png",
+        "resizeMode": "contain",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.alexander_aguirre123s.geolocalizacion"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "c5ac4b99-2566-4a0e-b883-8e24543df6f7"
-      }
-    },
-    "owner": "alexander_aguirre123s"
+      "assetBundlePatterns": ["**/*"],
+      "ios": {
+        "supportsTablet": true,
+        "infoPlist": {
+          "NSLocationWhenInUseUsageDescription": "Esta aplicación necesita acceso a tu ubicación para mostrar tu posición y enviar alertas de emergencia.",
+          "NSLocationAlwaysAndWhenInUseUsageDescription": "Esta aplicación necesita acceso a tu ubicación para enviar alertas de emergencia incluso cuando la app está en segundo plano.",
+          "UIBackgroundModes": ["location", "fetch"]
+        },
+        "bundleIdentifier": "com.yourcompany.emergencyapp"
+      },
+      "android": {
+        "adaptiveIcon": {
+          "foregroundImage": "./assets/adaptive-icon.png",
+          "backgroundColor": "#ffffff"
+        },
+        "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_BACKGROUND_LOCATION"],
+        "package": "com.yourcompany.emergencyapp"
+      },
+      "web": {
+        "favicon": "./assets/favicon.png"
+      },
+      "plugins": [
+        [
+          "expo-location",
+          {
+            "locationAlwaysAndWhenInUsePermission": "Esta aplicación necesita acceso a tu ubicación para enviar alertas de emergencia incluso cuando la app está en segundo plano.",
+            "locationAlwaysPermission": "Esta aplicación necesita acceso a tu ubicación para enviar alertas de emergencia incluso cuando la app está en segundo plano.",
+            "locationWhenInUsePermission": "Esta aplicación necesita acceso a tu ubicación para enviar alertas de emergencia."
+          }
+        ]
+      ],
+      "jsEngine": "hermes"
+    }
   }
-}
