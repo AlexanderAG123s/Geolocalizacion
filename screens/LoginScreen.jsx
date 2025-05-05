@@ -14,15 +14,19 @@ import {
   Animated,
   Modal,
   Alert,
+  ActivityIndicator,
 } from "react-native"
 import { LinearGradient } from "expo-linear-gradient"
+import { useTheme } from "../contexts/theme-context"
+import AsyncStorage from "@react-native-async-storage/async-storage"
 
 export default function LoginScreen({ navigation }) {
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [isFocused, setIsFocused] = useState({ username: false, password: false })
-  const [isDarkTheme, setIsDarkTheme] = useState(false)
+  const [isFocused, setIsFocused] = useState({ email: false, password: false })
   const [showThemeModal, setShowThemeModal] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const { theme, changeTheme } = useTheme()
 
   // Animaciones
   const fadeAnim = useRef(new Animated.Value(0)).current
@@ -31,20 +35,7 @@ export default function LoginScreen({ navigation }) {
   const modalScale = useRef(new Animated.Value(0.8)).current
   const modalOpacity = useRef(new Animated.Value(0)).current
 
-  // Colores según el tema
-  const theme = {
-    primary: isDarkTheme ? "#2196F3" : "#4CAF50",
-    secondary: isDarkTheme ? "#1976D2" : "#3d9140",
-    background: isDarkTheme ? ["#1a1a2e", "#16213e"] : ["#f5f7fa", "#e4e8eb"],
-    card: isDarkTheme ? "#0d1117" : "#FFFFFF",
-    text: isDarkTheme ? "#e6e6e6" : "#333333",
-    subtext: isDarkTheme ? "#a0a0a0" : "#666666",
-    inputBg: isDarkTheme ? "#1f2937" : "#F5F6F8",
-    inputBorder: isDarkTheme ? "#374151" : "#E8E8E8",
-  }
-
   useEffect(() => {
-    // Mostrar notificación al cargar
     setTimeout(() => {
       Alert.alert(
         "Bienvenido",
@@ -59,7 +50,6 @@ export default function LoginScreen({ navigation }) {
       )
     }, 500)
 
-    // Animación inicial
     setTimeout(() => {
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -76,7 +66,6 @@ export default function LoginScreen({ navigation }) {
     }, 300)
   }, [])
 
-  // Animación para el modal
   useEffect(() => {
     if (showThemeModal) {
       Animated.parallel([
@@ -107,33 +96,115 @@ export default function LoginScreen({ navigation }) {
     }
   }, [showThemeModal])
 
-  const handleLogin = () => {
-    // Animación cuando se presiona el botón
-    Animated.sequence([
-      Animated.spring(buttonScale, {
-        toValue: 0.95,
-        friction: 3,
-        useNativeDriver: true,
-      }),
-      Animated.spring(buttonScale, {
-        toValue: 1,
-        friction: 3,
-        useNativeDriver: true,
-      }),
-    ]).start()
+  // Función para manejar el login
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Campos vacíos", "Por favor completa todos los campos.")
+      return
+    }
 
-    // Mantener la misma lógica - navega a la pantalla "Alert"
-    navigation.navigate("Alert")
+    setIsLoading(true)
+
+    try {
+      console.log(
+        "Intentando conectar a:",
+        "http://192.168.0.14/GEOLOCALIZACION/Geolocalizacion-waos/backend/api/auth/login.php",
+      )
+
+      const response = await fetch(
+        "http://192.168.0.14/GEOLOCALIZACION/Geolocalizacion-waos/backend/api/auth/login.php",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json", // Solicitar explícitamente JSON
+          },
+          body: JSON.stringify({
+            correo: email,
+            contrasena: password,
+          }),
+        },
+      )
+
+      // Obtener la respuesta como texto primero
+      const responseText = await response.text()
+
+      // Log the first part of the response to see what's coming back
+      console.log("Respuesta del servidor (primeros 150 caracteres):", responseText.substring(0, 150))
+
+      // Verificar si la respuesta es HTML (contiene etiquetas HTML)
+      if (responseText.includes("<html") || responseText.includes("<!DOCTYPE") || responseText.trim().startsWith("<")) {
+        console.error("ERROR: El servidor devolvió HTML en lugar de JSON")
+        Alert.alert("Error de servidor", "El servidor no está configurado correctamente. Contacte al administrador.")
+        return
+      }
+
+      // Intentar parsear el JSON
+      let data
+      try {
+        data = JSON.parse(responseText)
+        console.log("Datos JSON parseados:", data)
+      } catch (parseError) {
+        console.error("Error al parsear JSON:", parseError)
+        console.error("Contenido recibido:", responseText)
+        Alert.alert("Error de formato", "La respuesta del servidor no tiene el formato JSON esperado.")
+        return
+      }
+
+      // Ahora manejar la respuesta parseada correctamente
+      if (response.ok && data.success) {
+        console.log("Conexión exitosa con la base de datos")
+        
+        // IMPORTANTE: Guardar el correo y nombre del usuario en AsyncStorage
+        await AsyncStorage.setItem('userEmail', data.user.correo)
+        await AsyncStorage.setItem('userName', data.user.nombre_completo)
+        
+        console.log("Datos guardados en AsyncStorage:", {
+          email: data.user.correo,
+          name: data.user.nombre_completo
+        })
+        
+        navigation.navigate("Alert")
+      } else {
+        Alert.alert("Error", data.message || "Credenciales incorrectas")
+      }
+    } catch (error) {
+      console.error("Login error:", error)
+      Alert.alert(
+        "Error de conexión",
+        "No se pudo conectar al servidor. Verifique su conexión a internet y que el servidor esté en línea.",
+      )
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const selectTheme = (isDark) => {
-    setIsDarkTheme(isDark)
+  // Referencia para los inputs
+  const passwordInputRef = useRef(null)
+
+  // Función para manejar el envío desde el teclado
+  const handleSubmitEditing = (inputName) => {
+    if (inputName === "email" && passwordInputRef.current) {
+      passwordInputRef.current.focus()
+    }
+    if (inputName === "password") {
+      handleLogin()
+    }
+  }
+
+  const selectTheme = (themeName) => {
+    changeTheme(themeName)
     setShowThemeModal(false)
   }
 
   return (
     <LinearGradient colors={theme.background} style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardAvoid}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoid}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+        enabled
+      >
         <Animated.View
           style={[
             styles.formContainer,
@@ -163,17 +234,24 @@ export default function LoginScreen({ navigation }) {
                   backgroundColor: theme.inputBg,
                   borderColor: theme.inputBorder,
                 },
-                isFocused.username && { borderColor: theme.primary, shadowColor: theme.primary },
+                isFocused.email && { borderColor: theme.primary, shadowColor: theme.primary }, // Actualizado aquí
               ]}
             >
               <TextInput
-                placeholder="Usuario"
+                placeholder="Email"
                 style={[styles.input, { color: theme.text }]}
-                value={username}
-                onChangeText={setUsername}
-                onFocus={() => setIsFocused({ ...isFocused, username: true })}
-                onBlur={() => setIsFocused({ ...isFocused, username: false })}
-                placeholderTextColor={isDarkTheme ? "#6B7280" : "#9EA0A4"}
+                value={email}
+                onChangeText={setEmail}
+                onFocus={() => setIsFocused({ ...isFocused, email: true })}
+                onBlur={() => setIsFocused({ ...isFocused, email: false })}
+                placeholderTextColor={theme.name === "dark" ? "#6B7280" : "#9EA0A4"}
+                editable={!isLoading}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                blurOnSubmit={false}
+                returnKeyType="next"
+                enablesReturnKeyAutomatically
+                onSubmitEditing={() => handleSubmitEditing("email")}
               />
             </View>
 
@@ -195,12 +273,22 @@ export default function LoginScreen({ navigation }) {
                 onChangeText={setPassword}
                 onFocus={() => setIsFocused({ ...isFocused, password: true })}
                 onBlur={() => setIsFocused({ ...isFocused, password: false })}
-                placeholderTextColor={isDarkTheme ? "#6B7280" : "#9EA0A4"}
+                placeholderTextColor={theme.name === "dark" ? "#6B7280" : "#9EA0A4"}
+                editable={!isLoading}
+                blurOnSubmit={true}
+                returnKeyType="done"
+                enablesReturnKeyAutomatically
+                ref={passwordInputRef}
+                onSubmitEditing={() => handleSubmitEditing("password")}
               />
             </View>
           </View>
 
-          <TouchableOpacity style={styles.forgotPassword} onPress={() => alert("Recuperar contraseña")}>
+          <TouchableOpacity
+            style={styles.forgotPassword}
+            onPress={() => navigation.navigate("RecoverPasswordScreen")}
+            disabled={isLoading}
+          >
             <Text style={[styles.forgotPasswordText, { color: theme.primary }]}>¿Olvidaste tu contraseña?</Text>
           </TouchableOpacity>
 
@@ -208,6 +296,7 @@ export default function LoginScreen({ navigation }) {
             style={[styles.button, { shadowColor: theme.primary }]}
             onPress={handleLogin}
             activeOpacity={0.8}
+            disabled={isLoading}
           >
             <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
               <LinearGradient
@@ -216,24 +305,30 @@ export default function LoginScreen({ navigation }) {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Text style={styles.buttonText}>Entrar</Text>
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.buttonText}>Entrar</Text>
+                )}
               </LinearGradient>
             </Animated.View>
           </TouchableOpacity>
 
-        <View style={styles.footer}>
-  <Text style={[styles.footerText, { color: theme.subtext }]}>¿No tienes cuenta?</Text>
-  <TouchableOpacity onPress={() => navigation.navigate("Register")}>
-    <Text style={[styles.registerText, { color: theme.primary }]}>Regístrate</Text>
-  </TouchableOpacity>
-</View>
-
+          <View style={styles.footer}>
+            <Text style={[styles.footerText, { color: theme.subtext }]}>¿No tienes cuenta?</Text>
+            <TouchableOpacity onPress={() => navigation.navigate("Register")} disabled={isLoading}>
+              <Text style={[styles.registerText, { color: theme.primary }]}>Regístrate</Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={[styles.themeToggle, { backgroundColor: theme.primary }]}
             onPress={() => setShowThemeModal(true)}
+            disabled={isLoading}
           >
-            <Text style={styles.themeToggleText}>{isDarkTheme ? "🌙" : "☀️"}</Text>
+            <Text style={styles.themeToggleText}>
+              {theme.name === "dark" ? "🌙" : theme.name === "darkOrange" ? "🔶" : "☀️"}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
       </KeyboardAvoidingView>
@@ -254,8 +349,8 @@ export default function LoginScreen({ navigation }) {
 
             <View style={styles.themeOptions}>
               <TouchableOpacity
-                style={[styles.themeOption, !isDarkTheme && styles.themeOptionSelected]}
-                onPress={() => selectTheme(false)}
+                style={[styles.themeOption, theme.name === "light" && styles.themeOptionSelected]}
+                onPress={() => selectTheme("light")}
               >
                 <LinearGradient colors={["#f5f7fa", "#e4e8eb"]} style={styles.themePreview}>
                   <View style={[styles.themePreviewButton, { backgroundColor: "#4CAF50" }]} />
@@ -264,13 +359,23 @@ export default function LoginScreen({ navigation }) {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.themeOption, isDarkTheme && styles.themeOptionSelected]}
-                onPress={() => selectTheme(true)}
+                style={[styles.themeOption, theme.name === "dark" && styles.themeOptionSelected]}
+                onPress={() => selectTheme("dark")}
               >
                 <LinearGradient colors={["#1a1a2e", "#16213e"]} style={styles.themePreview}>
                   <View style={[styles.themePreviewButton, { backgroundColor: "#2196F3" }]} />
                 </LinearGradient>
                 <Text style={styles.themeOptionText}>Oscuro (Azul)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.themeOption, theme.name === "darkOrange" && styles.themeOptionSelected]}
+                onPress={() => selectTheme("darkOrange")}
+              >
+                <LinearGradient colors={["#121212", "#1e1e1e"]} style={styles.themePreview}>
+                  <View style={[styles.themePreviewButton, { backgroundColor: "#FF5722" }]} />
+                </LinearGradient>
+                <Text style={styles.themeOptionText}>Negro (Naranja)</Text>
               </TouchableOpacity>
             </View>
 
@@ -375,7 +480,7 @@ const styles = StyleSheet.create({
     height: 55,
     borderRadius: 12,
     overflow: "hidden",
-    marginBottom: 25,
+    marginBottom: 15,
     shadowOffset: {
       width: 0,
       height: 4,
@@ -459,38 +564,40 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   themeOptions: {
-    flexDirection: "row",
+    flexDirection: "column",
     justifyContent: "space-around",
     marginBottom: 25,
+    gap: 15,
   },
   themeOption: {
     alignItems: "center",
-    width: "45%",
+    width: "100%",
     padding: 10,
     borderRadius: 10,
     borderWidth: 2,
     borderColor: "transparent",
+    flexDirection: "row",
   },
   themeOptionSelected: {
     borderColor: "#666",
     backgroundColor: "rgba(0, 0, 0, 0.05)",
   },
   themePreview: {
-    width: 100,
-    height: 100,
+    width: 60,
+    height: 60,
     borderRadius: 10,
-    marginBottom: 10,
+    marginRight: 15,
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
   },
   themePreviewButton: {
-    width: 50,
-    height: 20,
+    width: 30,
+    height: 15,
     borderRadius: 5,
   },
   themeOptionText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "500",
     color: "#333",
   },

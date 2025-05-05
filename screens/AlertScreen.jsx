@@ -2,79 +2,143 @@
 
 import { StatusBar } from "expo-status-bar"
 import React, { useEffect, useState, useRef } from "react"
-import {
-  Pressable,
-  StyleSheet,
-  View,
-  Alert,
-  Text,
-  Modal,
-  TouchableOpacity,
-  SafeAreaView,
-  TextInput,
-  ScrollView,
-  Animated,
-  Dimensions,
-} from "react-native"
+import { Pressable, StyleSheet, View, Alert, Text, Modal, TouchableOpacity, SafeAreaView, Linking } from "react-native"
 import MapView, { Marker } from "react-native-maps"
 import { FontAwesome } from "@expo/vector-icons"
 import * as Location from "expo-location"
+import { useTheme } from "../contexts/theme-context"
+import ElSidebar from "../components/elegant-sidebar"
+import AsyncStorage from "@react-native-async-storage/async-storage"
 
-export default function App() {
-  const [origin, setOrigin] = React.useState({
-    latitude: 19.6845823,
-    longitude: -99.1627131,
-  })
-  const [destination, setDestination] = React.useState({
-    latitude: 19.679444556072685,
-    longitude: -99.14825848149951,
-  })
+export default function AlertScreen({ navigation, route }) {
+  const { theme } = useTheme()
+  const [origin, setOrigin] = useState({ latitude: 19.6845823, longitude: -99.1627131 })
   const [userLocation, setUserLocation] = useState(null)
   const [errorMsg, setErrorMsg] = useState(null)
-  const [isTracking, setIsTracking] = useState(false)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [emergencyType, setEmergencyType] = useState("")
   const [sidebarVisible, setSidebarVisible] = useState(false)
-  const [activeTab, setActiveTab] = useState("settings")
+  const [modalVisible, setModalVisible] = useState(false)
+  const [isTracking, setIsTracking] = useState(false)
+  const [emergencyType, setEmergencyType] = useState("")
+  const [currentAlertId, setCurrentAlertId] = useState(null)
+  
+  // User data state
+  const [userEmail, setUserEmail] = useState(null)
+  const [userName, setUserName] = useState(null)
+  
+  // API base URL - usando tu dominio
+  const apiBaseUrl = "http://192.168.0.14/GEOLOCALIZACION/Geolocalizacion-waos/backend/api"
 
-  // Animation value for sidebar
-  const sidebarAnimation = useRef(new Animated.Value(0)).current
-
-  // Vehicle card information
-  const [vehicleInfo, setVehicleInfo] = useState({
-    plate: "",
-    make: "",
-    model: "",
-    year: "",
-    color: "",
-    vin: "",
-    insurance: "",
-  })
-
-  // Use a ref to store the location subscription
   const locationSubscription = useRef(null)
 
-  // Emergency types
   const emergencyTypes = [
-    { id: "ambulance", title: "Ambulancia", icon: "ambulance" },
-    { id: "car-theft", title: "Robo de Coche", icon: "car" },
-    { id: "kidnapping", title: "Secuestro", icon: "user-secret" },
-    { id: "fire", title: "Incendio", icon: "fire" },
     { id: "police", title: "Policía", icon: "shield" },
+    { id: "ambulance", title: "Ambulancia", icon: "ambulance" },
+    { id: "fire", title: "Incendio", icon: "fire" },
+    { id: "car-theft", title: "Robo de Coche", icon: "car" },
   ]
-
-  // Request location permissions on app start
+  
+  // Obtener datos del usuario desde AsyncStorage al montar el componente
   useEffect(() => {
+    const getUserData = async () => {
+      try {
+        // Obtener email del usuario desde AsyncStorage
+        const storedEmail = await AsyncStorage.getItem('userEmail')
+        const storedName = await AsyncStorage.getItem('userName')
+        
+        if (storedEmail) {
+          setUserEmail(storedEmail)
+          setUserName(storedName || "Usuario")
+          
+          // Verificar si hay una alerta activa para este usuario
+          checkActiveAlert(storedEmail)
+        } else {
+          // Si no hay email de usuario en storage, verificar si se pasó en los parámetros de ruta
+          const routeEmail = route.params?.userEmail
+          const routeName = route.params?.userName
+          
+          if (routeEmail) {
+            setUserEmail(routeEmail)
+            setUserName(routeName || "Usuario")
+            // Guardar en AsyncStorage para uso futuro
+            await AsyncStorage.setItem('userEmail', routeEmail)
+            if (routeName) {
+              await AsyncStorage.setItem('userName', routeName)
+            }
+            
+            // Verificar si hay una alerta activa para este usuario
+            checkActiveAlert(routeEmail)
+          } else {
+            // No hay email de usuario disponible, redirigir a login
+            Alert.alert(
+              "Sesión no encontrada", 
+              "Por favor inicie sesión nuevamente",
+              [{ text: "OK", onPress: () => navigation.navigate("Login") }]
+            )
+          }
+        }
+      } catch (error) {
+        console.error("Error retrieving user data:", error)
+      }
+    }
+    
+    getUserData()
+  }, [])
+
+  // Verificar si el usuario tiene una alerta activa
+  const checkActiveAlert = async (email) => {
+    try {
+      // Intentar hacer la solicitud
+      const response = await fetch(`${apiBaseUrl}/emergency/check_active_alert.php?correo=${encodeURIComponent(email)}`)
+      
+      // Si la respuesta no es exitosa (por ejemplo, 404), simplemente continuamos sin alerta activa
+      if (!response.ok) {
+        console.log("No se pudo verificar alertas activas, continuando sin alerta")
+        return
+      }
+      
+      // Intentar parsear la respuesta como JSON
+      let data
+      try {
+        data = await response.json()
+      } catch (error) {
+        console.error("Error parsing response:", error)
+        return
+      }
+      
+      if (data.success && data.has_active_alert) {
+        // El usuario tiene una alerta activa
+        setIsTracking(true)
+        setCurrentAlertId(data.alerta_id)
+        setEmergencyType(data.tipo_emergencia)
+        
+        // Iniciar seguimiento de ubicación
+        startLocationTracking(data.tipo_emergencia, data.alerta_id)
+        
+        Alert.alert(
+          "Alerta Activa", 
+          `Tienes una alerta de ${data.tipo_emergencia} activa. El seguimiento continuará.`,
+          [{ text: "OK" }]
+        )
+      }
+    } catch (error) {
+      // Capturar el error pero no hacer nada, simplemente continuamos sin alerta activa
+      console.error("Error checking active alert:", error)
+    }
+  }
+
+  useEffect(() => {
+    let isMounted = true
+
     ;(async () => {
       const { status } = await Location.requestForegroundPermissionsAsync()
-
       if (status !== "granted") {
-        setErrorMsg("Permission to access location was denied")
-        Alert.alert("Permission Denied", "Location permission is required for this feature.")
+        if (isMounted) {
+          setErrorMsg("Permission denied")
+          Alert.alert("Permiso denegado", "La ubicación es necesaria.")
+        }
         return
       }
 
-      // Get initial location once
       try {
         const initialLocation = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
@@ -85,45 +149,40 @@ export default function App() {
           longitude: initialLocation.coords.longitude,
         }
 
-        setUserLocation(userCoords)
-        setOrigin(userCoords)
+        if (isMounted) {
+          setUserLocation(userCoords)
+          setOrigin(userCoords)
+        }
       } catch (error) {
         console.error("Error getting initial location:", error)
-        setErrorMsg("Error getting location")
-        Alert.alert("Location Error", "Could not get your current location.")
+        if (isMounted) {
+          setErrorMsg("Error getting location")
+          Alert.alert("Error", "No se pudo obtener la ubicación.")
+        }
       }
     })()
 
-    // Clean up any subscription when component unmounts
     return () => {
+      isMounted = false
       stopLocationTracking()
     }
   }, [])
 
-  // Animate sidebar when visibility changes
-  useEffect(() => {
-    Animated.timing(sidebarAnimation, {
-      toValue: sidebarVisible ? 1 : 0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start()
-  }, [sidebarVisible, sidebarAnimation])
-
-  // Function to start location tracking
-  const startLocationTracking = async (type) => {
+  const startLocationTracking = async (type, existingAlertId = null) => {
     try {
-      // First stop any existing subscription
-      stopLocationTracking()
-
-      // Set the emergency type
+      // Si ya hay un seguimiento activo, detenerlo primero
+      if (locationSubscription.current) {
+        locationSubscription.current.remove()
+      }
+      
       setEmergencyType(type)
 
-      // Then start a new subscription
+      // Iniciar nuevo seguimiento de ubicación
       locationSubscription.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 1000, // Update every 1 second
-          distanceInterval: 5, // Update if moved by 5 meters
+          timeInterval: 1000,
+          distanceInterval: 5,
         },
         (location) => {
           const updatedCoords = {
@@ -132,12 +191,12 @@ export default function App() {
           }
 
           setUserLocation(updatedCoords)
-          // Also update origin to keep map centered on user
           setOrigin(updatedCoords)
 
+          // Enviar la ubicación de emergencia al backend
+          sendEmergencyLocation(type, updatedCoords, existingAlertId)
+
           console.log(`EMERGENCY (${type}): Location updated:`, updatedCoords)
-          // Here you would send this location to your emergency service
-          // along with the emergency type and vehicle info if available
         },
       )
 
@@ -145,45 +204,132 @@ export default function App() {
       console.log(`Emergency tracking started for: ${type}`)
     } catch (error) {
       console.error("Error starting location tracking:", error)
-      Alert.alert("Tracking Error", "Could not start location tracking.")
+      Alert.alert("Tracking Error", "No se pudo iniciar el rastreo.")
       setIsTracking(false)
     }
   }
 
-  // Function to stop location tracking
-  const stopLocationTracking = () => {
+  // Función para enviar la ubicación de emergencia al backend
+  const sendEmergencyLocation = async (type, coordinates, existingAlertId = null) => {
+    if (!userEmail) return
+    
+    try {
+      const response = await fetch(`${apiBaseUrl}/emergency/report.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          correo: userEmail,
+          tipo_emergencia: type,
+          latitud: coordinates.latitude,
+          longitud: coordinates.longitude,
+          alerta_id: existingAlertId // Esto es opcional, el backend lo manejará
+        })
+      })
+      
+      // Verificar si la respuesta es exitosa
+      if (!response.ok) {
+        console.error("Error response from server:", await response.text())
+        return
+      }
+      
+      // Intentar parsear la respuesta como JSON
+      let result
+      try {
+        result = await response.json()
+      } catch (error) {
+        console.error("Error parsing response:", error)
+        return
+      }
+      
+      console.log("Emergency location sent:", result)
+      
+      // Si es una nueva alerta, guardar el ID
+      if (result.success && result.data && result.data.es_nueva_alerta && result.data.alerta_id) {
+        setCurrentAlertId(result.data.alerta_id)
+      }
+    } catch (error) {
+      console.error("Error sending emergency location:", error)
+    }
+  }
+
+  const stopLocationTracking = async () => {
     if (locationSubscription.current) {
       locationSubscription.current.remove()
       locationSubscription.current = null
+      
+      // Finalizar la alerta en el servidor si tenemos un email de usuario
+      if (userEmail) {
+        try {
+          const response = await fetch(`${apiBaseUrl}/emergency/end_alert.php`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              correo: userEmail,
+              alerta_id: currentAlertId // Opcional, se puede finalizar por correo o por ID
+            })
+          })
+          
+          // Si el endpoint no existe o hay un error, simplemente lo registramos pero continuamos
+          if (!response.ok) {
+            console.log("No se pudo finalizar la alerta en el servidor, continuando...")
+          } else {
+            // Intentar parsear la respuesta como JSON
+            try {
+              const result = await response.json()
+              console.log("Alerta finalizada:", result)
+              
+              // Mostrar mensaje al usuario
+              if (result.success) {
+                Alert.alert("Alerta finalizada", "La alerta de emergencia ha sido finalizada.")
+              }
+            } catch (error) {
+              console.error("Error parsing response:", error)
+            }
+          }
+        } catch (error) {
+          console.error("Error al finalizar la alerta:", error)
+        }
+      }
+      
       setIsTracking(false)
       setEmergencyType("")
-      console.log("Emergency tracking stopped")
+      setCurrentAlertId(null)
+      console.log("Tracking stopped")
     }
   }
 
-  // Handle panic button press
   const handlePanicButton = () => {
     if (isTracking) {
-      // If already tracking, stop tracking
       stopLocationTracking()
     } else {
-      // If not tracking, show emergency options
       setModalVisible(true)
     }
   }
 
-  // Handle emergency type selection
   const handleEmergencySelect = (type) => {
     setModalVisible(false)
     startLocationTracking(type.id)
+
+    // Número de prueba
+    const phoneNumber = "tel:5518394345"
+
+    // Intentar iniciar la llamada
+    Linking.openURL(phoneNumber).catch((err) => {
+      console.error("Error making phone call:", err)
+      Alert.alert("Error", "No se pudo iniciar la llamada.")
+    })
+
     Alert.alert(
       "Emergencia Reportada",
-      `Se ha reportado: ${type.title}. Servicios de emergencia serán notificados de su ubicación cada 1 segundo.`,
-      [{ text: "OK" }],
+      `Se ha reportado: ${type.title}. Se está llamando al número de prueba.`,
+      [{ text: "OK" }]
     )
   }
 
-  // Function to manually center map on user's location
   const centerOnUser = async () => {
     try {
       const location = await Location.getCurrentPositionAsync({
@@ -199,206 +345,61 @@ export default function App() {
       setOrigin(userCoords)
     } catch (error) {
       console.error("Error updating location:", error)
-      Alert.alert("Location Error", "Could not update your current location.")
+      Alert.alert("Error", "No se pudo actualizar la ubicación.")
     }
   }
 
-  // Handle vehicle info changes
-  const handleVehicleInfoChange = (field, value) => {
-    setVehicleInfo((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
-  }
-
-  // Toggle sidebar visibility
   const toggleSidebar = () => {
     setSidebarVisible(!sidebarVisible)
   }
 
-  // Render the sidebar content based on active tab
-  const renderSidebarContent = () => {
-    switch (activeTab) {
-      case "vehicle":
-        return (
-          <ScrollView style={styles.sidebar_tab_content}>
-            <Text style={styles.sidebar_section_title}>Tarjeta Vehicular</Text>
-            <View style={styles.form_group}>
-              <Text style={styles.form_label}>Placa</Text>
-              <TextInput
-                style={styles.form_input}
-                value={vehicleInfo.plate}
-                onChangeText={(text) => handleVehicleInfoChange("plate", text)}
-                placeholder="Ingrese placa"
-                placeholderTextColor="#999"
-              />
-            </View>
-            <View style={styles.form_group}>
-              <Text style={styles.form_label}>Marca</Text>
-              <TextInput
-                style={styles.form_input}
-                value={vehicleInfo.make}
-                onChangeText={(text) => handleVehicleInfoChange("make", text)}
-                placeholder="Ingrese marca"
-                placeholderTextColor="#999"
-              />
-            </View>
-            <View style={styles.form_group}>
-              <Text style={styles.form_label}>Modelo</Text>
-              <TextInput
-                style={styles.form_input}
-                value={vehicleInfo.model}
-                onChangeText={(text) => handleVehicleInfoChange("model", text)}
-                placeholder="Ingrese modelo"
-                placeholderTextColor="#999"
-              />
-            </View>
-            <View style={styles.form_group}>
-              <Text style={styles.form_label}>Año</Text>
-              <TextInput
-                style={styles.form_input}
-                value={vehicleInfo.year}
-                onChangeText={(text) => handleVehicleInfoChange("year", text)}
-                placeholder="Ingrese año"
-                placeholderTextColor="#999"
-                keyboardType="numeric"
-              />
-            </View>
-            <View style={styles.form_group}>
-              <Text style={styles.form_label}>Color</Text>
-              <TextInput
-                style={styles.form_input}
-                value={vehicleInfo.color}
-                onChangeText={(text) => handleVehicleInfoChange("color", text)}
-                placeholder="Ingrese color"
-                placeholderTextColor="#999"
-              />
-            </View>
-            <View style={styles.form_group}>
-              <Text style={styles.form_label}>Número VIN</Text>
-              <TextInput
-                style={styles.form_input}
-                value={vehicleInfo.vin}
-                onChangeText={(text) => handleVehicleInfoChange("vin", text)}
-                placeholder="Ingrese VIN"
-                placeholderTextColor="#999"
-              />
-            </View>
-            <View style={styles.form_group}>
-              <Text style={styles.form_label}>Seguro</Text>
-              <TextInput
-                style={styles.form_input}
-                value={vehicleInfo.insurance}
-                onChangeText={(text) => handleVehicleInfoChange("insurance", text)}
-                placeholder="Ingrese información de seguro"
-                placeholderTextColor="#999"
-              />
-            </View>
-            <TouchableOpacity
-              style={styles.save_button}
-              onPress={() => {
-                Alert.alert("Información Guardada", "Los datos del vehículo han sido guardados.")
-              }}
-            >
-              <Text style={styles.save_button_text}>Guardar</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        )
-      case "settings":
-        return (
-          <View style={styles.sidebar_tab_content}>
-            <Text style={styles.sidebar_section_title}>Configuración</Text>
-            <View style={styles.settings_option}>
-              <Text style={styles.settings_label}>Intervalo de actualización</Text>
-              <Text style={styles.settings_value}>1 segundo</Text>
-            </View>
-            <View style={styles.settings_option}>
-              <Text style={styles.settings_label}>Precisión de ubicación</Text>
-              <Text style={styles.settings_value}>Alta</Text>
-            </View>
-            <View style={styles.settings_option}>
-              <Text style={styles.settings_label}>Notificaciones</Text>
-              <Text style={styles.settings_value}>Activadas</Text>
-            </View>
-          </View>
-        )
-      case "contacts":
-        return (
-          <View style={styles.sidebar_tab_content}>
-            <Text style={styles.sidebar_section_title}>Contactos de Emergencia</Text>
-            <Text style={styles.sidebar_text}>Agregue contactos que serán notificados en caso de emergencia.</Text>
-            <TouchableOpacity style={styles.add_contact_button}>
-              <FontAwesome name="plus" size={16} color="white" />
-              <Text style={styles.add_contact_text}>Agregar Contacto</Text>
-            </TouchableOpacity>
-          </View>
-        )
-      default:
-        return null
+  const handleLogout = async () => {
+    setSidebarVisible(false)
+    
+    // Si hay una alerta activa, preguntar al usuario si desea finalizarla
+    if (isTracking) {
+      Alert.alert(
+        "Alerta Activa",
+        "Tienes una alerta de emergencia activa. ¿Deseas finalizarla antes de cerrar sesión?",
+        [
+          {
+            text: "Finalizar y Salir",
+            onPress: async () => {
+              await stopLocationTracking()
+              performLogout()
+            }
+          },
+          {
+            text: "Mantener Activa",
+            onPress: () => performLogout(),
+            style: "cancel"
+          }
+        ]
+      )
+    } else {
+      performLogout()
     }
   }
-
-  // Calculate sidebar position based on animation value
-  const sidebarLeft = sidebarAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-250, 0],
-  })
-
-  // Get screen dimensions
-  const screenWidth = Dimensions.get("window").width
+  
+  const performLogout = async () => {
+    try {
+      // Limpiar datos de usuario de AsyncStorage
+      await AsyncStorage.removeItem('userEmail')
+      await AsyncStorage.removeItem('userName')
+      // Podrías querer limpiar otros datos relacionados con el usuario también
+      
+      Alert.alert("Sesión cerrada", "Has cerrado sesión correctamente")
+      navigation.navigate("Login")
+    } catch (error) {
+      console.error("Error during logout:", error)
+      Alert.alert("Error", "No se pudo cerrar la sesión correctamente")
+    }
+  }
 
   return (
     <View style={styles.container}>
       <StatusBar style="auto" />
 
-      {/* Left Sidebar */}
-      <Animated.View style={[styles.sidebar, { left: sidebarLeft }]}>
-        <View style={styles.sidebar_header}>
-          <Text style={styles.sidebar_title}>Opciones</Text>
-          <TouchableOpacity style={styles.sidebar_close} onPress={toggleSidebar}>
-            <FontAwesome name="times" size={24} color="black" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.sidebar_tabs}>
-          <TouchableOpacity
-            style={[styles.sidebar_tab, activeTab === "vehicle" && styles.sidebar_tab_active]}
-            onPress={() => setActiveTab("vehicle")}
-          >
-            <FontAwesome name="car" size={20} color={activeTab === "vehicle" ? "#fff" : "#333"} />
-            <Text style={[styles.sidebar_tab_text, activeTab === "vehicle" && styles.sidebar_tab_text_active]}>
-              Vehículo
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.sidebar_tab, activeTab === "settings" && styles.sidebar_tab_active]}
-            onPress={() => setActiveTab("settings")}
-          >
-            <FontAwesome name="cog" size={20} color={activeTab === "settings" ? "#fff" : "#333"} />
-            <Text style={[styles.sidebar_tab_text, activeTab === "settings" && styles.sidebar_tab_text_active]}>
-              Ajustes
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.sidebar_tab, activeTab === "contacts" && styles.sidebar_tab_active]}
-            onPress={() => setActiveTab("contacts")}
-          >
-            <FontAwesome name="users" size={20} color={activeTab === "contacts" ? "#fff" : "#333"} />
-            <Text style={[styles.sidebar_tab_text, activeTab === "contacts" && styles.sidebar_tab_text_active]}>
-              Contactos
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {renderSidebarContent()}
-      </Animated.View>
-
-      {/* Semi-transparent overlay when sidebar is open */}
-      {sidebarVisible && <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={toggleSidebar} />}
-
-      {/* Main Content - No longer using Animated.View with marginLeft */}
       <View style={styles.main_content}>
         <MapView
           style={styles.map}
@@ -408,29 +409,25 @@ export default function App() {
             latitudeDelta: 0.09,
             longitudeDelta: 0.04,
           }}
+          customMapStyle={theme.mapStyle}
         >
-          {/* User's current location marker */}
-          {userLocation && <Marker coordinate={userLocation} title="You are here" pinColor="blue" />}
-
+          {userLocation && <Marker coordinate={userLocation} title="Tú estás aquí" pinColor="blue" />}
           <Marker
             pinColor="Blue"
             draggable
             coordinate={origin}
-            onDragEnd={(direction) => setOrigin(direction.nativeEvent.coordinate)}
+            onDragEnd={(e) => setOrigin(e.nativeEvent.coordinate)}
           />
         </MapView>
 
-        {/* Location button to recenter on user */}
         <Pressable style={styles.location_button} onPress={centerOnUser}>
           <FontAwesome name="location-arrow" size={24} color="black" />
         </Pressable>
 
-        {/* Sidebar toggle button */}
         <Pressable style={styles.sidebar_button} onPress={toggleSidebar}>
           <FontAwesome name="bars" size={24} color="black" />
         </Pressable>
 
-        {/* Panic button - changes color when tracking is active */}
         <Pressable
           style={[styles.warning_button, isTracking ? styles.tracking_active : {}]}
           onPress={handlePanicButton}
@@ -439,26 +436,37 @@ export default function App() {
           <Text style={styles.button_text}>{isTracking ? "STOP" : "SOS"}</Text>
         </Pressable>
 
-        {/* Status indicator */}
         {isTracking && (
           <View style={styles.status_indicator}>
             <Text style={styles.status_text}>
               {emergencyType
                 ? `Emergencia: ${emergencyTypes.find((t) => t.id === emergencyType)?.title || emergencyType}`
-                : "Tracking Active"}
+                : "Tracking activo"}
             </Text>
           </View>
         )}
       </View>
 
-      {/* Emergency Type Modal */}
+      {/* Pasar userEmail y API URL a ElSidebar */}
+      <ElSidebar
+        isVisible={sidebarVisible}
+        onClose={() => setSidebarVisible(false)}
+        onLogout={handleLogout}
+        userEmail={userEmail}
+        userName={userName}
+        navigation={navigation}
+        apiUrl={apiBaseUrl}
+      />
+
+      {sidebarVisible && (
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setSidebarVisible(false)} />
+      )}
+
       <Modal
         animationType="slide"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={() => {
-          setModalVisible(false)
-        }}
+        onRequestClose={() => setModalVisible(false)}
       >
         <SafeAreaView style={styles.modal_container}>
           <View style={styles.modal_content}>
@@ -486,286 +494,67 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  main_content: {
-    flex: 1,
-    position: "relative",
-  },
-  map: {
-    width: "100%",
-    height: "100%",
-  },
+  container: { flex: 1 },
+  main_content: { flex: 1, position: "relative" },
+  map: { width: "100%", height: "100%" },
   overlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    zIndex: 5,
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.3)", zIndex: 5,
   },
   warning_button: {
-    position: "absolute",
-    width: 100,
-    height: 100,
-    backgroundColor: "red",
-    borderRadius: 50,
-    bottom: 40,
-    alignSelf: "center",
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1, // Ensure button stays above map
+    position: "absolute", width: 100, height: 100, backgroundColor: "red",
+    borderRadius: 50, bottom: 40, alignSelf: "center",
+    elevation: 5, shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3, shadowRadius: 3, justifyContent: "center", alignItems: "center", zIndex: 1,
   },
   tracking_active: {
     backgroundColor: "#d9534f",
     borderWidth: 3,
     borderColor: "white",
   },
-  button_text: {
-    color: "white",
-    fontWeight: "bold",
-    marginTop: 5,
-  },
+  button_text: { color: "white", fontWeight: "bold", marginTop: 5 },
   location_button: {
-    position: "absolute",
-    width: 50,
-    height: 50,
-    backgroundColor: "white",
-    borderRadius: 25,
-    top: 60,
-    right: 20,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1, // Ensure button stays above map
+    position: "absolute", width: 50, height: 50, backgroundColor: "white",
+    borderRadius: 25, top: 60, right: 20, elevation: 5,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3, shadowRadius: 3, justifyContent: "center", alignItems: "center", zIndex: 1,
   },
   sidebar_button: {
-    position: "absolute",
-    width: 50,
-    height: 50,
-    backgroundColor: "white",
-    borderRadius: 25,
-    top: 60,
-    left: 20,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1, // Ensure button stays above map
+    position: "absolute", width: 50, height: 50, backgroundColor: "white",
+    borderRadius: 25, top: 60, left: 20, elevation: 5,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3, shadowRadius: 3, justifyContent: "center", alignItems: "center", zIndex: 1,
   },
   status_indicator: {
-    position: "absolute",
-    top: 40,
-    alignSelf: "center",
-    backgroundColor: "rgba(217, 83, 79, 0.8)",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    zIndex: 1, // Ensure indicator stays above map
+    position: "absolute", top: 40, alignSelf: "center",
+    backgroundColor: "rgba(217, 83, 79, 0.8)", paddingVertical: 8,
+    paddingHorizontal: 16, borderRadius: 20, zIndex: 1,
   },
-  status_text: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  // Modal styles
+  status_text: { color: "white", fontWeight: "bold" },
   modal_container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    flex: 1, justifyContent: "center", alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   modal_content: {
-    width: "80%",
-    backgroundColor: "#333",
-    borderRadius: 20,
-    padding: 20,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    width: "80%", backgroundColor: "#333", borderRadius: 20,
+    padding: 20, alignItems: "center", shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25,
+    shadowRadius: 4, elevation: 5,
   },
   modal_title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 20,
-    color: "white",
-    textAlign: "center",
+    fontSize: 20, fontWeight: "bold", marginBottom: 20,
+    color: "white", textAlign: "center",
   },
   emergency_option: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "red",
-    width: "100%",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: "red", width: "100%", padding: 15,
+    borderRadius: 10, marginBottom: 10,
   },
-  option_icon: {
-    marginRight: 15,
-  },
-  option_text: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
+  option_icon: { marginRight: 15 },
+  option_text: { color: "white", fontSize: 18, fontWeight: "bold" },
   cancel_button: {
-    marginTop: 10,
-    padding: 15,
-    borderRadius: 10,
-    backgroundColor: "#555",
-    width: "100%",
-    alignItems: "center",
+    marginTop: 10, padding: 15, borderRadius: 10,
+    backgroundColor: "#555", width: "100%", alignItems: "center",
   },
-  cancel_text: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  // Sidebar styles
-  sidebar: {
-    position: "absolute",
-    width: 250,
-    height: "100%",
-    backgroundColor: "white",
-    zIndex: 10,
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  sidebar_header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  sidebar_title: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  sidebar_close: {
-    padding: 5,
-  },
-  sidebar_tabs: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  sidebar_tab: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 15,
-    backgroundColor: "#f5f5f5",
-  },
-  sidebar_tab_active: {
-    backgroundColor: "#007bff",
-  },
-  sidebar_tab_text: {
-    marginLeft: 8,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  sidebar_tab_text_active: {
-    color: "white",
-  },
-  sidebar_tab_content: {
-    padding: 20,
-    flex: 1,
-  },
-  sidebar_section_title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 15,
-  },
-  sidebar_text: {
-    marginBottom: 15,
-    color: "#666",
-  },
-  // Form styles
-  form_group: {
-    marginBottom: 15,
-  },
-  form_label: {
-    fontSize: 16,
-    marginBottom: 5,
-    fontWeight: "500",
-  },
-  form_input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 5,
-    padding: 10,
-    fontSize: 16,
-    backgroundColor: "#f9f9f9",
-  },
-  save_button: {
-    backgroundColor: "#28a745",
-    padding: 15,
-    borderRadius: 5,
-    alignItems: "center",
-    marginTop: 10,
-    marginBottom: 30,
-  },
-  save_button_text: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  // Settings styles
-  settings_option: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  settings_label: {
-    fontSize: 16,
-  },
-  settings_value: {
-    fontSize: 16,
-    color: "#007bff",
-    fontWeight: "500",
-  },
-  // Contact styles
-  add_contact_button: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#007bff",
-    padding: 12,
-    borderRadius: 5,
-    justifyContent: "center",
-    marginTop: 15,
-  },
-  add_contact_text: {
-    color: "white",
-    fontWeight: "bold",
-    marginLeft: 8,
-  },
+  cancel_text: { color: "white", fontSize: 16, fontWeight: "bold" },
 })
-
