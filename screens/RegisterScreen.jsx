@@ -309,14 +309,14 @@ export default function RegisterScreen({ navigation }) {
 
       console.log(
         "Enviando solicitud a:",
-        "http://192.168.0.14/GEOLOCALIZACION/Geolocalizacion-waos/backend/api/auth/register.php",
+        "http://192.168.1.68/GEOLOCALIZACION/backend/api/auth/register.php",
       )
 
       // Imprimir los datos que se están enviando para depuración
       console.log("Enviando datos:", Object.fromEntries(formDataObj._parts))
 
       const response = await fetch(
-        "http://192.168.0.14/GEOLOCALIZACION/Geolocalizacion-waos/backend/api/auth/register.php",
+        "http://192.168.1.68/GEOLOCALIZACION/backend/api/auth/register.php",
         {
           method: "POST",
           headers: {

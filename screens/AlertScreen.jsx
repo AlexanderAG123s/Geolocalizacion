@@ -26,7 +26,7 @@ export default function AlertScreen({ navigation, route }) {
   const [userName, setUserName] = useState(null)
   
   // API base URL - usando tu dominio
-  const apiBaseUrl = "http://192.168.0.14/GEOLOCALIZACION/Geolocalizacion-waos/backend/api"
+  const apiBaseUrl = "http://192.168.1.68/GEOLOCALIZACION/backend/api"
 
   const locationSubscription = useRef(null)
 

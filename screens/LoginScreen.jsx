@@ -108,11 +108,11 @@ export default function LoginScreen({ navigation }) {
     try {
       console.log(
         "Intentando conectar a:",
-        "http://192.168.0.14/GEOLOCALIZACION/Geolocalizacion-waos/backend/api/auth/login.php",
+        "http://192.168.1.68/GEOLOCALIZACION/backend/api/auth/login.php",
       )
 
       const response = await fetch(
-        "http://192.168.0.14/GEOLOCALIZACION/Geolocalizacion-waos/backend/api/auth/login.php",
+        "http://192.168.1.68/GEOLOCALIZACION/backend/api/auth/login.php",
         {
           method: "POST",
           headers: {
